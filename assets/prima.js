@@ -7406,69 +7406,6 @@ async function send() {
 }
 
 
-function newConversation() {
-  state.restoreBlocked = false;
-  clearPrimaResumeCapabilityV1();
-  state.conversationAccessToken = null;
-  state.conversationId =
-    null;
-
-    state.conversationStartPromise =
-      null;
-
-    state.conversationInitiator =
-      null;
-
-    state.greetingText =
-      null;
-
-    state.greetingShown =
-      false;
-
-    state.firstUserTurnPending =
-      false;
-
-    state.awaitingName =
-      false;
-
-    state.turnSequence =
-      0;
-
-  state.searchContext =
-    null;
-
-  state.searchPagination =
-    null;
-
-  state.lastSearchQuery =
-    "";
-
-  state.pendingSearchContext =
-    null;
-
-  // D6_RETURN_PREVIOUS_SEARCH_V1
-  state.d6ResumeD5ProjectsV1 = null;
-
-  dynamic.innerHTML =
-    "";
-
-  input.value =
-    "";
-
-  scrollToBottom(
-    false
-  );
-
-  input.focus();
-
-  console.log(
-    "Prima conversation reset"
-  );
-
-    startPrimaConversation();
-}
-
-
 minimizeButton
   ?.addEventListener(
     "click",
@@ -7520,31 +7457,6 @@ input
       }
     }
   );
-
-
-/*
-  Existing sidebar New conversation control
-  has no dedicated id in V12.
-*/
-for (
-  const item of
-    document.querySelectorAll(
-      ".side-link"
-    )
-) {
-  if (
-    /new conversation/i
-      .test(
-        item.textContent ||
-        ""
-      )
-  ) {
-    item.addEventListener(
-      "click",
-      newConversation
-    );
-  }
-}
 
 
 window.addEventListener(
