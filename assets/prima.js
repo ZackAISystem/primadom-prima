@@ -1,3 +1,21 @@
+/* Prima embedded presentation controls; no change to dialog or Worker. */
+const PRIMA_EMBED_CONTROL_V1 =
+  window.self !== window.top &&
+  new URLSearchParams(window.location.search).get('embed') === '1';
+
+if (PRIMA_EMBED_CONTROL_V1) {
+  document.documentElement.classList.add('prima-embedded-dialog-v1');
+}
+
+function primaNotifyHostV1(type) {
+  if (!PRIMA_EMBED_CONTROL_V1) return false;
+  window.parent.postMessage(
+    { version: 'PrimaEmbedControlV1', type: type },
+    'https://primadom.ai'
+  );
+  return true;
+}
+
 const API_BASE =
   window.PRIMA_WORKER_URL ||
   (
@@ -452,6 +470,7 @@ function openDialog() {
 
 
 function minimizeDialog() {
+  if (primaNotifyHostV1('prima:embed:minimize')) return;
   state.savedScrollTop =
     scroll.scrollTop;
 
@@ -7431,6 +7450,7 @@ closeButton
   ?.addEventListener(
     "click",
     () => {
+      if (primaNotifyHostV1('prima:embed:close')) return;
       window.location.href =
         "https://primadom.ai/en/";
     }

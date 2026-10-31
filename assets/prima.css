@@ -268,3 +268,10 @@ html,body{width:100%;height:100%;overflow:hidden}
   border-color: rgba(231, 151, 112, 0.5) !important;
   box-shadow: 0 0 0 1px rgba(231, 151, 112, 0.13) !important;
 }
+
+/* PRIMA EMBED CONTROL V1 — standalone styles unchanged */
+html.prima-embedded-dialog-v1 .live-site,
+html.prima-embedded-dialog-v1 .mini,
+html.prima-embedded-dialog-v1 .note {
+  display: none !important;
+}
