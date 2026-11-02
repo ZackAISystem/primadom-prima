@@ -4801,7 +4801,7 @@ function primaCatalogCandidateV1(message) {
 async function primaCatalogProjectsV1() {
   if (!primaCatalogPromiseV1) {
     primaCatalogPromiseV1 = fetch(
-      "/search/project-projections-v3/en.json"
+      "https://primadom.ai/search/project-projections-v3/en.json"
     )
       .then(response => {
         if (!response.ok) {
