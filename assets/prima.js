@@ -5599,6 +5599,19 @@ async function send() {
   const pendingSearchContext =
     state.pendingSearchContext;
 
+  // PAGINATION_UI_FAST_V1: only an already verified, offset-bound
+  // SearchContext may skip decorative text animation. Worker still
+  // persists the turn and validates SearchPaginationV1 as before.
+  const paginationFastUiV1 =
+    value === "Show 3 more" &&
+    pendingSearchContext?.version === "SearchContextV1" &&
+    pendingSearchContext?.entity_type === "project" &&
+    Number.isInteger(pendingSearchContext.current_batch_offset) &&
+    pendingSearchContext.current_batch_offset > 0;
+  const paginationUiStartMsV1 = paginationFastUiV1
+    ? performance.now()
+    : null;
+
   state.pendingSearchContext =
     null;
 
@@ -5636,6 +5649,10 @@ async function send() {
     createAssistantTurn(
       true
     );
+
+  if (paginationFastUiV1) {
+    assistant.message.textContent = "Loading the next verified matches…";
+  }
 
   scrollToBottom();
 
@@ -7229,10 +7246,29 @@ async function send() {
       data?.answer ||
       "I couldn't produce an answer for that request.";
 
-    await revealText(
-      assistant.message,
-      answer
-    );
+    if (
+      paginationFastUiV1 &&
+      data?.version === "ResponseContractV1" &&
+      data?.route === "property_search" &&
+      data?.response_type === "search_results" &&
+      data?.search_pagination?.version === "SearchPaginationV1" &&
+      data.search_pagination.current_offset === pendingSearchContext.current_batch_offset &&
+      Array.isArray(data.cards) &&
+      data.cards.length > 0
+    ) {
+      assistant.message.textContent = answer;
+      assistant.message.style.color = "";
+      console.info("prima_pagination_verified_timing", {
+        elapsed_before_card_render_ms: Math.round(performance.now() - paginationUiStartMsV1),
+        worker_total_ms: data?.meta?.worker_total_ms ?? null,
+        openai_calls_attempted: data?.meta?.openai_calls_attempted ?? null,
+        offset: data.search_pagination.current_offset,
+        card_count: data.cards.length
+      });
+      scrollToBottom(false);
+    } else {
+      await revealText(assistant.message, answer);
+    }
 
     renderInlineBold(
       assistant.message
