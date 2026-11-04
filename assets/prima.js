@@ -1910,19 +1910,12 @@ function d6ReturnPreviousSearchIntentV1(message = "", searchContext = null) {
 function shouldCarrySearchContext(
   message = ""
 ) {
-  const q = String(message || "");
-  // Carry verified context for an explicit search follow-up, never an
-  // unrelated new request. Worker/Interpreter own the actual intent.
-  const referringToPriorResults =
-    /\b(this one|that one|(?:the\s+)?(?:first|second|third|1st|2nd|3rd)\s+(?:one|project|option)|(?:first|second|third|1st|2nd|3rd)\s+and\s+(?:first|second|third|1st|2nd|3rd)\s+projects?|those|these|what about|how about|and this|and that|which one|why this|why that|same for)\b/i.test(q);
-  const referencingSearch =
-    /\b(?:that|this|same|previous|earlier|last|original)\s+(?:area|district|community|neighbou?rhood|developer|location|budget|search|filters?|results?|projects?|properties|options)\b/i.test(q) ||
-    /\b(?:my|our)\s+(?:original|previous|last|current|existing)\s+(?:budget|search|filters?|criteria|requirements?)\b/i.test(q);
-  const refiningOrRecalling =
-    /\b(?:remind\s+me|recall|recap|only\s+want|keep|retain|leave|refine|change|adjust|modify|update|increase|raise|lower|decrease|reduce|switch)\b/i.test(q) &&
-    /\b(?:my|our|budget|price|aed|bedrooms?|apartments?|villas?|townhouses?|location|district|area|developer|off[- ]?plan|ready|filters?|search|criteria|looking\s+for)\b/i.test(q);
-  return d6ReturnPreviousSearchIntentV1(q, state.searchContext) ||
-    referringToPriorResults || referencingSearch || refiningOrRecalling;
+  return d6ReturnPreviousSearchIntentV1(message, state.searchContext) || /\b(this one|that one|(?:the\s+)?(?:first|second|third|1st|2nd|3rd)\s+(?:one|project|option)|those|these|what about|how about|and this|and that|which one|why this|why that|same for)\b/i
+    .test(
+      String(
+        message || ""
+      )
+    );
 }
 
 
