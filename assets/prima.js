@@ -3074,6 +3074,7 @@ async function d4ResolveBareDeveloperIntent(message) {
   }
   let candidate = original
     .replace(/^(?:(?:please|can you|could you|would you)\s+)?(?:show(?:\s+me)?|find(?:\s+me)?|search(?:\s+for)?|look\s+up|explore|view|see|tell\s+me\s+(?:more\s+)?about|what\s+do\s+you\s+(?:know|think)\s+(?:about|of)|what\s+about|how\s+about|i\s+(?:want|would\s+like)\s+to\s+(?:know|learn)\s+(?:more\s+)?about|who\s+is|what\s+is|info(?:rmation)?\s+about|about)\s+/i, "")
+    .replace(/\s+and\s+(?:show(?:\s+me)?|give\s+me)\s+(?:its|their|the)\s+(?:developer\s+)?(?:profile|overview|details)\s*[.!?]*$/i, "")
     .replace(/\s+(?:developer|company|profile|builder)\s*[.!?]*$/i, "")
     .replace(/[.!?]+$/, "")
     .trim();
@@ -3100,7 +3101,7 @@ function primaD5NamedDistrictCandidateV3(message) {
   }
 
   let candidate = original.replace(/[.!?]+$/, "").trim()
-    .replace(/\s+(?:and\s+)?(?:show|give)(?:\s+me)?\s+(?:its|their|the)\s+(?:profile|overview|details)$/i, "")
+    .replace(/\s+(?:and\s+)?(?:show|give)(?:\s+me)?\s+(?:its|their|the)\s+(?:district\s+|area\s+|community\s+)?(?:profile|overview|details)$/i, "")
     .replace(/\s+(?:profile|overview|details)$/i, "")
     .replace(/^(?:please\s+)?(?:find|show(?:\s+me)?|explore|view|tell\s+me\s+about|look\s+up)\s+/i, "")
     .replace(/^(?:the\s+)?(?:district|area|community|neighbou?rhood)(?:\s+(?:of|called|named))?\s+/i, "")
@@ -5977,7 +5978,10 @@ async function send() {
       data?.action === "search_projects" &&
       data?.entity_type === "project" &&
       d5District &&
-      d5District.mode !== "projects"
+      d5District.mode !== "projects" &&
+      // An explicit district-directory request is authoritative even if
+      // the Worker erroneously routed it as project search.
+      !(d5GeoIntent && d5District.mode === "list")
     ) {
       console.info("prima_project_tool_ignores_d5_discovery", {
         discarded_mode: d5District.mode
