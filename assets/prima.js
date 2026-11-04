@@ -70,7 +70,8 @@ const state = {
   searchContext: null,
   searchPagination: null,
   lastSearchQuery: "",
-  pendingSearchContext: null
+  pendingSearchContext: null,
+  pendingPaginationAction: null
 };
 
 
@@ -1755,29 +1756,44 @@ function renderSearchQuickActions(
     more.textContent =
       "Show 3 more";
 
-    more.addEventListener(
-      "click",
-      () => {
-        if (state.busy) {
-          return;
-        }
-
-        const nextContext = {
-          ...state.searchContext,
-
-          current_batch_offset:
-            pagination.next_offset
-        };
-
-        state.pendingSearchContext =
-          nextContext;
-
-        input.value =
-          "Show 3 more";
-
-        send();
+    const runMore = () => {
+      if (
+        !more.isConnected ||
+        state.busy ||
+        state.searchContext?.version !== "SearchContextV1" ||
+        state.searchContext?.entity_type !== "project" ||
+        !Array.isArray(state.searchContext.results) ||
+        state.searchContext.results.length !== pagination.next_offset
+      ) {
+        more.disabled = false;
+        more.textContent = "Show 3 more";
+        return;
       }
-    );
+
+      more.disabled = true;
+      more.textContent = "Loading...";
+
+      state.pendingSearchContext = {
+        ...state.searchContext,
+        current_batch_offset: pagination.next_offset
+      };
+
+      input.value = "Show 3 more";
+      void send();
+    };
+
+    more.addEventListener("click", () => {
+      if (state.pendingPaginationAction) return;
+
+      if (state.busy) {
+        more.disabled = true;
+        more.textContent = "Loading...";
+        state.pendingPaginationAction = runMore;
+        return;
+      }
+
+      runMore();
+    });
 
     quick.appendChild(
       more
@@ -7493,6 +7509,13 @@ async function send() {
     input.focus();
 
     scrollToBottom();
+
+    const pendingPagination = state.pendingPaginationAction;
+    state.pendingPaginationAction = null;
+
+    if (typeof pendingPagination === "function") {
+      queueMicrotask(pendingPagination);
+    }
   }
 }
 
