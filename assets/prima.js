@@ -2877,6 +2877,10 @@ async function renderD4DeveloperCards(batch, query, sourceMessage = null, trackC
 
   if (batch.has_more === true && (f213Remaining === null || f213Remaining > results.length)) {
     let loading = false;
+    const nextOffset = Number(batch.current_batch_offset || 0) + results.length;
+    // Warm the next *verified Registry* page. Keep a normal fetch fallback.
+    const warmedNext = fetchD4DeveloperBatch(query, nextOffset)
+      .catch(error => {console.warn("d4_page_prefetch_failed", error); return null;});
 
     const more = makeAction("Show 3 more", async () => {
       if (state.busy || loading) return;
@@ -2885,13 +2889,8 @@ async function renderD4DeveloperCards(batch, query, sourceMessage = null, trackC
       more.disabled = true;
 
       try {
-        const nextOffset =
-          Number(batch.current_batch_offset || 0) +
-          results.length;
-
-        const next = await fetchD4DeveloperBatch(
-          query, nextOffset
-        );
+        const next = (await warmedNext) ||
+          await fetchD4DeveloperBatch(query, nextOffset);
 
         quick.remove();
         renderD4DeveloperCards(next, query, null, true,
@@ -4616,7 +4615,7 @@ async function renderD5DistrictListV1(firstBatch, textReady, f213Limit = Infinit
 
       await Promise.race([
         image.decode().catch(() => {}),
-        new Promise(resolve => setTimeout(resolve, 1200))
+        new Promise(resolve => setTimeout(resolve, continuation ? 150 : 1200))
       ]);
     }));
 
@@ -5849,6 +5848,10 @@ async function send() {
 
           ...CONTEXT,
 
+          // Worker uses a separate authenticated persistence-preserving
+          // branch only when the exact Search V3 batch is validated.
+          pagination_fastpath_v1: paginationFastUiV1,
+
           turn: {
             version:
               "ConversationTurnV1",
@@ -6737,6 +6740,15 @@ async function send() {
       });
 
       let loadingBatch = false;
+      let warmedDeveloperLinks = null;
+      const warmDeveloperLinks = () => {
+        if (displayed >= total) return;
+        const offset = displayed;
+        const promise = Promise.all(developers.slice(offset, offset+3)
+          .map(item => resolveVerifiedD4Url(item.name.trim())))
+          .catch(error => {console.warn("d5_developer_link_prefetch_failed",error); return null;});
+        warmedDeveloperLinks = {offset,promise};
+      };
 
       const drawNext = async () => {
         if (loadingBatch || displayed >= total) return;
@@ -6753,11 +6765,12 @@ async function send() {
 
           // Concurrent verification for the next three developers.
           // Cards appear with their final set of actions.
-          const links = await Promise.all(
-            next.map(item =>
+          const links =
+            (warmedDeveloperLinks?.offset === displayed
+              ? await warmedDeveloperLinks.promise : null) ||
+            await Promise.all(next.map(item =>
               resolveVerifiedD4Url(item.name.trim())
-            )
-          );
+            ));
 
           // D4_D5_PAGINATION_BOTTOM_V1
           // Initial three cards retain their original location.
@@ -6780,6 +6793,7 @@ async function send() {
           });
 
           displayed += next.length;
+          warmDeveloperLinks();
         } finally {
           loadingBatch = false;
           more.disabled = false;
