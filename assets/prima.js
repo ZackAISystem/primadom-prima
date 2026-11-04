@@ -5974,6 +5974,24 @@ async function send() {
       }
     }
 
+    // Typed Worker tool requests are authoritative for the result entity type.
+    // Concurrent D5 discovery may match "area" + budget in a PROJECT query;
+    // district lists must never replace an explicit Search V3 project request.
+    // Retain verified D5 project contexts for existing cross-entity handoffs.
+    if (
+      data?.version === "PrimaToolRequestV1" &&
+      data?.tool === "prima_search" &&
+      data?.action === "search_projects" &&
+      data?.entity_type === "project" &&
+      d5District &&
+      d5District.mode !== "projects"
+    ) {
+      console.info("prima_project_tool_ignores_d5_discovery", {
+        discarded_mode: d5District.mode
+      });
+      d5District = null;
+    }
+
 
 
 
