@@ -3998,7 +3998,23 @@ async function renderD5DistrictProjectPagesV2(
       let loading = false;
 
       const more = addAction("Show 3 more", async () => {
-        if (state.busy || loading) return;
+        if (loading) return;
+
+        if (state.busy) {
+          if (state.pendingPaginationAction) return;
+
+          more.disabled = true;
+          more.textContent = "Loading...";
+
+          state.pendingPaginationAction = () => {
+            if (!more.isConnected) return;
+
+            more.disabled = false;
+            more.textContent = "Show 3 more";
+            more.click();
+          };
+          return;
+        }
 
         loading = true;
         more.disabled = true;
