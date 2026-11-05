@@ -1745,6 +1745,20 @@ function renderSearchQuickActions(
     ) &&
     state.searchContext
   ) {
+    // Bind this button to its verified project batch at creation time.
+    // An entity follow-up may replace the mutable global searchContext
+    // with a single profile while the earlier pagination button persists.
+    const pageContext =
+      state.searchContext?.version === "SearchContextV1" &&
+      state.searchContext?.entity_type === "project" &&
+      Array.isArray(state.searchContext?.results) &&
+      state.searchContext.results.length === pagination.next_offset
+        ? {
+            ...state.searchContext,
+            results: state.searchContext.results.slice()
+          }
+        : null;
+
     const more =
       document.createElement(
         "button"
@@ -1757,16 +1771,33 @@ function renderSearchQuickActions(
       "Show 3 more";
 
     const runMore = () => {
+      // Keep the original pagination cursor authoritative. Do not use
+      // a later one-result entity profile as the paging source.
+      const currentContext = state.searchContext;
+      const currentValid =
+        currentContext?.version === "SearchContextV1" &&
+        currentContext?.entity_type === "project" &&
+        Array.isArray(currentContext.results) &&
+        currentContext.results.length === pagination.next_offset &&
+        currentContext.query === pageContext?.query;
+      const sourceContext = currentValid ? currentContext : pageContext;
+
       if (
         !more.isConnected ||
         state.busy ||
-        state.searchContext?.version !== "SearchContextV1" ||
-        state.searchContext?.entity_type !== "project" ||
-        !Array.isArray(state.searchContext.results) ||
-        state.searchContext.results.length !== pagination.next_offset
+        state.searchPagination !== pagination ||
+        sourceContext?.version !== "SearchContextV1" ||
+        sourceContext?.entity_type !== "project" ||
+        !Array.isArray(sourceContext.results) ||
+        sourceContext.results.length !== pagination.next_offset
       ) {
         more.disabled = false;
         more.textContent = "Show 3 more";
+        console.warn("project_pagination_context_unavailable", {
+          next_offset: pagination.next_offset,
+          current_length: currentContext?.results?.length ?? null,
+          bound_length: pageContext?.results?.length ?? null
+        });
         return;
       }
 
@@ -1774,7 +1805,7 @@ function renderSearchQuickActions(
       more.textContent = "Loading...";
 
       state.pendingSearchContext = {
-        ...state.searchContext,
+        ...sourceContext,
         current_batch_offset: pagination.next_offset
       };
 
@@ -2899,7 +2930,22 @@ async function renderD4DeveloperCards(batch, query, sourceMessage = null, trackC
       .catch(error => {console.warn("d4_page_prefetch_failed", error); return null;});
 
     const more = makeAction("Show 3 more", async () => {
-      if (state.busy || loading) return;
+      if (loading) return;
+
+      // Preserve the first click while a previous chat turn is finishing.
+      // The normal send() finally block executes this once busy clears.
+      if (state.busy) {
+        if (state.pendingPaginationAction) return;
+        more.disabled = true;
+        more.textContent = "Loading...";
+        state.pendingPaginationAction = () => {
+          if (!more.isConnected) return;
+          more.disabled = false;
+          more.textContent = "Show 3 more";
+          more.click();
+        };
+        return;
+      }
 
       loading = true;
       more.disabled = true;
