@@ -1745,14 +1745,14 @@ function renderSearchQuickActions(
     ) &&
     state.searchContext
   ) {
-    // Bind this button to its verified project batch at creation time.
-    // An entity follow-up may replace the mutable global searchContext
-    // with a single profile while the earlier pagination button persists.
+    // Bind to the verified accumulated search list. SearchContextV1 may
+    // already hold 10 candidates while only the first 3 cards are shown.
+    // A later entity follow-up may replace the mutable global context.
     const pageContext =
       state.searchContext?.version === "SearchContextV1" &&
       state.searchContext?.entity_type === "project" &&
       Array.isArray(state.searchContext?.results) &&
-      state.searchContext.results.length === pagination.next_offset
+      state.searchContext.results.length > pagination.next_offset
         ? {
             ...state.searchContext,
             results: state.searchContext.results.slice()
@@ -1771,14 +1771,14 @@ function renderSearchQuickActions(
       "Show 3 more";
 
     const runMore = () => {
-      // Keep the original pagination cursor authoritative. Do not use
-      // a later one-result entity profile as the paging source.
+      // Keep the original cursor; require the next cached result to exist.
+      // Worker still validates the entire bounded batch and persists it.
       const currentContext = state.searchContext;
       const currentValid =
         currentContext?.version === "SearchContextV1" &&
         currentContext?.entity_type === "project" &&
         Array.isArray(currentContext.results) &&
-        currentContext.results.length === pagination.next_offset &&
+        currentContext.results.length > pagination.next_offset &&
         currentContext.query === pageContext?.query;
       const sourceContext = currentValid ? currentContext : pageContext;
 
@@ -1789,7 +1789,7 @@ function renderSearchQuickActions(
         sourceContext?.version !== "SearchContextV1" ||
         sourceContext?.entity_type !== "project" ||
         !Array.isArray(sourceContext.results) ||
-        sourceContext.results.length !== pagination.next_offset
+        sourceContext.results.length <= pagination.next_offset
       ) {
         more.disabled = false;
         more.textContent = "Show 3 more";
