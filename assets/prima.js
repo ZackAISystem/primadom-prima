@@ -3053,6 +3053,14 @@ async function tryDeveloperPortfolioV1(request) {
 
   if (!match && !villas && !byProjects) return null;
 
+  // P0-03C: "projects by Developer in District" is a faceted Project Search,
+  // not a pure developer portfolio.  Let the existing Search V3 apply both
+  // constraints; never treat "in District" as part of a developer's name.
+  // Pure portfolio and budgeted portfolio continue through D4 unchanged.
+  if (byProjects && /\s+in\s+[^.!?]+\s*[.!?]*$/i.test(byProjects[1])) {
+    return null;
+  }
+
   const name = String(match?.[1] || villas?.[1] || byProjects?.[1] || "")
     .replace(/^(?:the|all)\s+/i,"").trim();
   const confirmedDeveloper = await d4CanonicalDeveloperName(name);
@@ -7133,7 +7141,22 @@ async function send() {
         d4FilteredContext ||
         f1RecommendationContext ||
         (await tryDeveloperPortfolioV1(data)) ||
-        (await runPrimaProjectSearchBridge(data));
+        (await (async () => {
+          // P0-03C: Keep original user message for Worker tool_continuation.
+          // Search V3 already supports "Developer projects in District" form.
+          const match = String(data?.query || "").trim().match(
+            /^(?:show(?: me)?|find|list)?\s*projects?\s+by\s+(.+?)\s+in\s+([^.!?]+)\s*[.!?]*$/i
+          );
+          const searchQuery = match
+            ? `Show me ${match[1].trim()} projects in ${match[2].trim()}`
+            : data.query;
+          const result = await runPrimaProjectSearchBridge({
+            ...data, query: searchQuery
+          });
+          return match && result?.version === "SearchContextV1"
+            ? {...result, query: data.query}
+            : result;
+        })());
 
       if (
         !searchContext ||
