@@ -5761,7 +5761,16 @@ async function send() {
     // D5_GEO_PARALLEL_V1
     // Start verified emirate discovery before the main conversation request.
     // The conversation request itself remains unchanged.
+    // P0-07 B05: explicit emirate directory questions may be worded as
+    // questions, not just "Show districts in ...". Canonicalize for existing
+    // D5 only; retain the original message for Worker / Conversation.
+    const p007EmirateDirectoryQuestion = String(value || "").trim().match(
+      /^(?:what|which)\s+(?:neighbou?rhoods|districts|areas|communities)\s+(?:can|could|should)\s+i\s+(?:explore|see|browse|consider|visit)\s+in\s+(dubai|abu dhabi|sharjah|ajman|ras al khaimah|fujairah|umm al quwain)\s*[.!?]*$/i
+    );
+    const p007D5Query = p007EmirateDirectoryQuestion
+      ? `Show districts in ${p007EmirateDirectoryQuestion[1]}` : value;
     const d5GeoIntent =
+      Boolean(p007EmirateDirectoryQuestion) ||
       /^(?:(?:show(?: me)?|find|list|browse)\s+)?(?:all\s+)?(?:the\s+)?(?:districts|areas|neighbou?rhoods|communities)\s+in\s+(dubai|abu dhabi|sharjah|ajman|ras al khaimah|fujairah|umm al quwain|uaq|rak)\s*[.!?]?$/i
         .test(value);
 
@@ -5825,10 +5834,13 @@ async function send() {
         : null;
 
     const d5GeoPromise =
-      (entityPreflightAllowed && (f213Intent?.type === "district" || d5GeoIntent || d5SmartIntent || d5BudgetIntent ||
+      // P0-07: only a literal, known-emirate directory question may bypass
+      // named-entity preflight; no arbitrary natural-language request can.
+      ((entityPreflightAllowed || Boolean(p007EmirateDirectoryQuestion)) &&
+       (f213Intent?.type === "district" || d5GeoIntent || d5SmartIntent || d5BudgetIntent ||
         d5DiscussIntent || d5CrossEntityIntent))
         ? tryD5DistrictRequestV1(f213Intent?.type === "district"
-            ? f213Intent.searchQuery : (d6ContextFollowupQuery || value), null)
+            ? f213Intent.searchQuery : (d6ContextFollowupQuery || p007D5Query), null)
           .catch(error => {
             console.warn("d5_geo_lookup_failed", error);
             return null;
@@ -6062,8 +6074,14 @@ async function send() {
     const workerConversationOnly = !isToolRequest(data) &&
       ["persona_question", "contact_intent", "unsupported", "off_topic"]
         .includes(data?.route);
+    // P0-08 B04: a completed Knowledge answer with no cards must not open
+    // an unrelated D5 directory. Explicit D5 directory/search tools still win.
+    const p008CompletedKnowledgeAnswer = !isToolRequest(data) &&
+      data?.route === "page_question" && data?.response_type === "answer" &&
+      Array.isArray(data?.cards) && data.cards.length === 0 &&
+      !/^(?:show|find|list|browse|compare)\b/i.test(String(value || "").trim());
     let d5District = null;
-    if (!workerConversationOnly) {
+    if (!workerConversationOnly && !p008CompletedKnowledgeAnswer) {
       try {
         d5District = (await d5ShortPromise) ||
           (d5GeoPromise
